@@ -1,0 +1,54 @@
+import datetime
+import random
+import re
+import ssl
+from urllib.parse import quote
+from urllib.request import urlopen
+
+from bs4 import BeautifulSoup
+
+context = ssl._create_unverified_context()
+pages = set()
+random.seed(datetime.datetime.now())
+
+# 获取页面所有的内链列表
+def getInternalLinks(bsObj, includeUr):
+    internalLinks = []
+#     找到所有以"／"开头的链接
+    for link in bsObj.findAll("a",href=re.compile("^(/|.*"+includeUr+")")):
+        if link.attrs["href"] is not None:
+            internalLinks.append(link.attrs["href"])
+    return internalLinks
+
+# 获取页面的所有外链的列表
+def getExternalLinks(bsObj, excludeUrl):
+    externalLinks = []
+#    找出所有以"http"或则"www"或者"https"开头且不包含当前URL的链接
+    for link in bsObj.findAll("a",
+                              href=re.compile("^(http|www|https)((?!"+excludeUrl+").)*$")):
+        if link.attrs["href"] is not None:
+            if link.attrs["href"] not in externalLinks:
+                externalLinks.append(link.attrs["href"])
+    return externalLinks
+
+def splitAddress(address):
+    addressParts = address.replace("http://","").split("/")
+    return  addressParts
+
+
+def getRandomExternalLink(startingPage):
+    html = urlopen(startingPage)
+    bsObj = BeautifulSoup(html)
+    externalLinks = getExternalLinks(bsObj,splitAddress(startingPage)[0])
+    if len(externalLinks) == 0:
+        internalLinks = getInternalLinks(startingPage)
+        return getExternalLinks(internalLinks[random.randint(0,len(internalLinks)-1)])
+    else:
+        return externalLinks[random.randint(0,len(externalLinks)-1)]
+
+def followExternalOnly(startingSite):
+    externalLink = getRandomExternalLink(startingSite)
+    print("随即外链是："+externalLink+"\n")
+    followExternalOnly(externalLink)
+
+followExternalOnly("http://www.baidu.com")
